@@ -21,7 +21,7 @@ pipeline {
             steps {
                 script {
                     // Get branch name (strip "origin/" prefix)
-                    env.BRANCH       = sh(script: 'git rev-parse, --abbrev-ref HEAD', returnStdout: true).trim()
+                    env.BRANCH       = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
                     // Get full commit hash
                     env.COMMIT_HASH  = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                     // Who triggered this build
