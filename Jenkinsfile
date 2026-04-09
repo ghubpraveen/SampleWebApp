@@ -2,13 +2,13 @@ pipeline {
     agent any
 
 
-    triggers {
-        pollSCM('* * * * *')
-    }
-
     // triggers {
-    //     githubPush()   // auto-triggers when code is pushed/merged
+    //     pollSCM('* * * * *')
     // }
+
+    triggers {
+        githubPush()   // auto-triggers when code is pushed/merged
+    }
 
     environment {
         // Where params file will be saved on Jenkins VM
@@ -21,7 +21,7 @@ pipeline {
             steps {
                 script {
                     // Get branch name (strip "origin/" prefix)
-                    env.BRANCH       = env.GIT_BRANCH?.replaceAll('origin/', '') ?: 'master'
+                    env.BRANCH       = sh(script: 'git rev-parse, --abbrev-ref HEAD', returnStdout: true).trim()
                     // Get full commit hash
                     env.COMMIT_HASH  = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                     // Who triggered this build
