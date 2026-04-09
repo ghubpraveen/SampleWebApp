@@ -6,9 +6,9 @@ pipeline {
         pollSCM('H/5 * * * *')
     }
 
-    triggers {
-        githubPush()   // auto-triggers when code is pushed/merged
-    }
+    // triggers {
+    //     githubPush()   // auto-triggers when code is pushed/merged
+    // }
 
     environment {
         // Where params file will be saved on Jenkins VM
