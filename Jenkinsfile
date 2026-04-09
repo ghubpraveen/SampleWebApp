@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
     triggers {
         githubPush()   // auto-triggers when code is pushed/merged
     }
@@ -65,7 +70,7 @@ WORKSPACE=${env.WORKSPACE}
                 script {
                     sh """
                         echo "📦 Reading params and building WAR..."
-                        bash ${env.WORKSPACE}/java_deployment.sh ${env.PARAMS_FILE}
+                        bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}
                     """
                 }
             }
