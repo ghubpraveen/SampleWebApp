@@ -31,7 +31,7 @@ echo "==============================="
 # ── Step 3: Go to workspace and build WAR ─────────────────
 cd "$WORKSPACE"
 
-echo "🔨 Starting Maven WAR build..."
+echo "🔨 Starting Maven WAR build...."
 mvn clean package -DskipTests
 
 # ── Step 4: Confirm WAR was created ───────────────────────

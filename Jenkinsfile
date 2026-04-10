@@ -17,11 +17,19 @@ pipeline {
 
     stages {
 
+        stage('0. Checkoout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        
+        
         stage('1. Extract Parameters from Merge') {
             steps {
                 script {
                     // Get branch name (strip "origin/" prefix)
-                    env.BRANCH       = env.GIT_BRANCH?.replaceAll('origin/', '') ?: 'master'
+                    env.BRANCH       = env.GIT_BRANCH?.replaceAll('origin/', '')
                     // Get full commit hash
                     env.COMMIT_HASH  = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                     // Who triggered this build
