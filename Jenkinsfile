@@ -55,7 +55,7 @@ pipeline {
             steps {
                 script {
                     // Create the directory if it doesn't exist
-                    mkdir -p \$(dirname ${env.PARAMS_FILE})
+                    mkdir -p $(dirname ${env.PARAMS_FILE})
 
                     // Write all params — shell script will read this
                     writeFile file: env.PARAMS_FILE, text: """\
