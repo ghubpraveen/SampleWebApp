@@ -1,8 +1,12 @@
 pipeline {
     agent any
 
+    // triggers {
+    //     pollSCM('* * * * *')
+    // }
+    
     triggers {
-        pollSCM('* * * * *')
+        githubPush()   // auto-triggers when code is pushed/merged
     }
 
     environment {
@@ -26,11 +30,15 @@ pipeline {
                     env.REQUIRED    = 'Build'
                     env.BUILD_ENV   = 'uat'
 
-                    echo "BRANCH      : ${env.BRANCH}"
-                    echo "COMMIT_HASH : ${env.COMMIT_HASH}"
-                    echo "BUILD_CAUSE : ${env.BUILD_CAUSE}"
-                    echo "REQUIRED    : ${env.REQUIRED}"
-                    echo "BUILD_ENV   : ${env.BUILD_ENV}"
+                    echo """
+                    ======= Parameters Extracted =======
+                    BRANCH      : ${env.BRANCH}
+                    COMMIT_HASH : ${env.COMMIT_HASH}
+                    BUILD_CAUSE : ${env.BUILD_CAUSE}
+                    REQUIRED    : ${env.REQUIRED}
+                    BUILD_ENV   : ${env.BUILD_ENV}
+                    ====================================
+                    """
                 }
             }
         }
@@ -47,23 +55,30 @@ pipeline {
 
         stage('3. Build WAR') {
             steps {
-                sh '#!/bin/sh -e\ncd ${WORKSPACE} && mvn clean package -DskipTests'
+                script {
+                    sh """
+                        echo "📦 Reading params and building WAR..."
+                        bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}
+                    """
+                }
             }
         }
 
         stage('4. Archive WAR') {
             steps {
+                // Save the WAR as a Jenkins build artifact
                 archiveArtifacts artifacts: 'target/*.war', fingerprint: true
+                echo "✅ WAR archived successfully"
             }
         }
     }
 
     post {
         success {
-            echo "SUCCESS"
+            echo "🎉 Build SUCCESS — Branch: ${env.BRANCH} | Commit: ${env.COMMIT_HASH}"
         }
         failure {
-            echo "FAILED"
+            echo "❌ Build FAILED — Check console output above"
         }
     }
 }
