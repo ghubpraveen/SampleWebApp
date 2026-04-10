@@ -1,52 +1,36 @@
 pipeline {
     agent any
 
-
     triggers {
         pollSCM('* * * * *')
     }
 
-    // triggers {
-    //     githubPush()   // auto-triggers when code is pushed/merged
-    // }
-
     environment {
-        // Where params file will be saved on Jenkins VM
         PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
     }
 
     stages {
 
-        stage('0. Checkoout') {
+        stage('0. Checkout') {
             steps {
                 checkout scm
             }
         }
-        
-        
-        
-        stage('1. Extract Parameters from Merge') {
+
+        stage('1. Extract Parameters') {
             steps {
                 script {
-                    // Get branch name (strip "origin/" prefix)
-                    env.BRANCH       = env.GIT_BRANCH.replaceAll('origin/', '')
-                    // Get full commit hash
+                    env.BRANCH      = env.GIT_BRANCH.replaceAll('origin/', '')
                     env.COMMIT_HASH = env.GIT_COMMIT
-                    // Who triggered this build
-                    env.BUILD_CAUSE  = 'jenkins-bot'
-                    // For this learning exercise, always do a Build
-                    env.REQUIRED     = 'Build'
-                    env.BUILD_ENV    = 'uat'
+                    env.BUILD_CAUSE = 'jenkins-bot'
+                    env.REQUIRED    = 'Build'
+                    env.BUILD_ENV   = 'uat'
 
-                    echo """
-                    ======= Parameters Extracted =======
-                    BRANCH      : ${env.BRANCH}
-                    COMMIT_HASH : ${env.COMMIT_HASH}
-                    BUILD_CAUSE : ${env.BUILD_CAUSE}
-                    REQUIRED    : ${env.REQUIRED}
-                    BUILD_ENV   : ${env.BUILD_ENV}
-                    ====================================
-                    """
+                    echo "BRANCH      : ${env.BRANCH}"
+                    echo "COMMIT_HASH : ${env.COMMIT_HASH}"
+                    echo "BUILD_CAUSE : ${env.BUILD_CAUSE}"
+                    echo "REQUIRED    : ${env.REQUIRED}"
+                    echo "BUILD_ENV   : ${env.BUILD_ENV}"
                 }
             }
         }
@@ -54,53 +38,32 @@ pipeline {
         stage('2. Write Params to File') {
             steps {
                 script {
-                    // Create the directory if it doesn't exist
-                    writeFile file: env.PARAMS_FILE, text: """\
-
-                    // Write all params — shell script will read this
-                    writeFile file: env.PARAMS_FILE, text: """\
-
-                    JOB_NAME=${env.JOB_NAME}
-                    BRANCH=${env.BRANCH}
-                    COMMIT_HASH=${env.COMMIT_HASH}
-                    BUILD_ENV=${env.BUILD_ENV}
-                    REQUIRED=${env.REQUIRED}
-                    BUILD_CAUSE=${env.BUILD_CAUSE}
-                    WORKSPACE=${env.WORKSPACE}
-                    
-                    """
-                    echo "✅ Params written to: ${env.PARAMS_FILE}"
-                    echo readFile("${env.WORKSPACE}/build-params.env")
+                    writeFile file: env.PARAMS_FILE, text: "JOB_NAME=${env.JOB_NAME}\nBRANCH=${env.BRANCH}\nCOMMIT_HASH=${env.COMMIT_HASH}\nBUILD_ENV=${env.BUILD_ENV}\nREQUIRED=${env.REQUIRED}\nBUILD_CAUSE=${env.BUILD_CAUSE}\nWORKSPACE=${env.WORKSPACE}\n"
+                    echo "Params written:"
+                    echo readFile(env.PARAMS_FILE)
                 }
             }
         }
 
         stage('3. Build WAR') {
             steps {
-                script {
-                    echo "📦 Reading params and building WAR..."
-                    bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}
-                    
-                }
+                sh '#!/bin/sh -e\ncd ${WORKSPACE} && mvn clean package -DskipTests'
             }
         }
 
         stage('4. Archive WAR') {
             steps {
-                // Save the WAR as a Jenkins build artifact
                 archiveArtifacts artifacts: 'target/*.war', fingerprint: true
-                echo "✅ WAR archived successfully"
             }
         }
     }
 
     post {
         success {
-            echo "🎉 Build SUCCESS — Branch: ${env.BRANCH} | Commit: ${env.COMMIT_HASH}"
+            echo "SUCCESS"
         }
         failure {
-            echo "❌ Build FAILED — Check console output above"
-            }
+            echo "FAILED"
         }
     }
-}               
+}
