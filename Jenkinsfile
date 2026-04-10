@@ -29,7 +29,7 @@ pipeline {
             steps {
                 script {
                     // Get branch name (strip "origin/" prefix)
-                    env.BRANCH       = env.GIT_BRANCH?.replaceAll('origin/', '')
+                    env.BRANCH       = env.GIT_BRANCH.replaceAll('origin/', '')
                     // Get full commit hash
                     env.COMMIT_HASH  = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                     // Who triggered this build
