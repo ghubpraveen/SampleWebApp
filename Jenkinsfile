@@ -12,7 +12,7 @@ pipeline {
 
     environment {
         // Where params file will be saved on Jenkins VM
-        PARAMS_FILE = "/tmp/jenkins-params/${env.JOB_NAME}-build-params.env"
+        PARAMS_FILE = "env.WORKSPACE/build-params.env"
     }
 
     stages {
