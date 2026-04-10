@@ -58,7 +58,7 @@ pipeline {
                 script {
                     echo "📦 Reading params and building WAR..."
 
-                    ['bin/bash', '-x',
+                    ['/bin/bash', '-x',
                     "${env.WORKSPACE}/deploy.sh",
                     "${env.WORKSPACE}/build-params.env"
                     ].execute().waitForProcessOutput(System.out, System.err)
