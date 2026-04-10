@@ -54,18 +54,34 @@ pipeline {
         }
 
         stage('3. Build WAR') {
-            steps {
-                script {
-                    echo "📦 Reading params and building WAR..."
+    steps {
+        script {
+            echo "Reading params and building WAR..."
 
-                    ['/bin/bash', '-x',
-                    "${env.WORKSPACE}/deploy.sh",
-                    "${env.WORKSPACE}/build-params.env"
-                    ].execute().waitForProcessOutput(System.out, System.err)
-                                        
-                }
+            def process = [
+                '/bin/bash',
+                '-x',
+                "${env.WORKSPACE}/deploy.sh",
+                "${env.WORKSPACE}/build-params.env"
+            ].execute()
+
+            // Capture output without System.out / System.err
+            def stdout = new StringBuilder()
+            def stderr = new StringBuilder()
+            process.waitForProcessOutput(stdout, stderr)
+
+            // Print using Jenkins echo — no System access needed
+            if (stdout) echo "OUTPUT:\n${stdout}"
+            if (stderr) echo "STDERR:\n${stderr}"
+
+            if (process.exitValue() != 0) {
+                error("deploy.sh failed with exit code: ${process.exitValue()}")
             }
+
+            echo "deploy.sh completed successfully"
         }
+    }
+}
 
         stage('4. Archive WAR') {
             steps {
