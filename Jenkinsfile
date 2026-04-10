@@ -55,6 +55,10 @@ pipeline {
 
         stage('3. Build WAR') {
             steps {
+                sh """
+                    chmod +x ${env.WORKSPACE}/deploy.sh
+                    bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}
+                """
 
                 echo "📦 Reading params and building WAR..."
                 sh "bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}"
