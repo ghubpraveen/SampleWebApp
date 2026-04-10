@@ -55,9 +55,9 @@ pipeline {
 
         stage('3. Build WAR') {
             steps {
-                script {
-                    sh "bash -x ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}"
-                }
+                
+                echo "📦 Reading params and building WAR..."
+                bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}
             }
         }
         stage('4. Archive WAR') {
