@@ -2,13 +2,13 @@ pipeline {
     agent any
 
 
-    // triggers {
-    //     pollSCM('* * * * *')
-    // }
-
     triggers {
-        githubPush()   // auto-triggers when code is pushed/merged
+        pollSCM('* * * * *')
     }
+
+    // triggers {
+    //     githubPush()   // auto-triggers when code is pushed/merged
+    // }
 
     environment {
         // Where params file will be saved on Jenkins VM
