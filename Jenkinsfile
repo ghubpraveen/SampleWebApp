@@ -59,14 +59,16 @@ pipeline {
 
                     // Write all params — shell script will read this
                     writeFile file: env.PARAMS_FILE, text: """\
-JOB_NAME=${env.JOB_NAME}
-BRANCH=${env.BRANCH}
-COMMIT_HASH=${env.COMMIT_HASH}
-BUILD_ENV=${env.BUILD_ENV}
-REQUIRED=${env.REQUIRED}
-BUILD_CAUSE=${env.BUILD_CAUSE}
-WORKSPACE=${env.WORKSPACE}
-"""
+
+                    JOB_NAME=${env.JOB_NAME}
+                    BRANCH=${env.BRANCH}
+                    COMMIT_HASH=${env.COMMIT_HASH}
+                    BUILD_ENV=${env.BUILD_ENV}
+                    REQUIRED=${env.REQUIRED}
+                    BUILD_CAUSE=${env.BUILD_CAUSE}
+                    WORKSPACE=${env.WORKSPACE}
+                    
+                    """
                     echo "✅ Params written to: ${env.PARAMS_FILE}"
                     echo readFile("${env.WORKSPACE}/build-params.env")
                 }
