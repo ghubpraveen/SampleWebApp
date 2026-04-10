@@ -31,7 +31,7 @@ pipeline {
                     // Get branch name (strip "origin/" prefix)
                     env.BRANCH       = env.GIT_BRANCH.replaceAll('origin/', '')
                     // Get full commit hash
-                    env.COMMIT_HASH  = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    env.COMMIT_HASH = env.GIT_COMMIT
                     // Who triggered this build
                     env.BUILD_CAUSE  = 'jenkins-bot'
                     // For this learning exercise, always do a Build
@@ -55,7 +55,7 @@ pipeline {
             steps {
                 script {
                     // Create the directory if it doesn't exist
-                    sh "mkdir -p \$(dirname ${env.PARAMS_FILE})"
+                    mkdir -p \$(dirname ${env.PARAMS_FILE})
 
                     // Write all params — shell script will read this
                     writeFile file: env.PARAMS_FILE, text: """\
@@ -68,7 +68,7 @@ BUILD_CAUSE=${env.BUILD_CAUSE}
 WORKSPACE=${env.WORKSPACE}
 """
                     echo "✅ Params written to: ${env.PARAMS_FILE}"
-                    sh "cat ${env.PARAMS_FILE}"
+                    cat ${env.PARAMS_FILE}
                 }
             }
         }
@@ -76,10 +76,9 @@ WORKSPACE=${env.WORKSPACE}
         stage('3. Build WAR') {
             steps {
                 script {
-                    sh """
-                        echo "📦 Reading params and building WAR..."
-                        bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}
-                    """
+                    echo "📦 Reading params and building WAR..."
+                    bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}
+                    
                 }
             }
         }
