@@ -12,7 +12,7 @@ pipeline {
 
     environment {
         // Where params file will be saved on Jenkins VM
-        PARAMS_FILE = "env.WORKSPACE/build-params.env"
+        PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
     }
 
     stages {
@@ -55,7 +55,7 @@ pipeline {
             steps {
                 script {
                     // Create the directory if it doesn't exist
-                    mkdir -p $(dirname ${env.PARAMS_FILE})
+                    writeFile file: env.PARAMS_FILE, text: """\
 
                     // Write all params — shell script will read this
                     writeFile file: env.PARAMS_FILE, text: """\
@@ -68,7 +68,7 @@ BUILD_CAUSE=${env.BUILD_CAUSE}
 WORKSPACE=${env.WORKSPACE}
 """
                     echo "✅ Params written to: ${env.PARAMS_FILE}"
-                    cat ${env.PARAMS_FILE}
+                    echo readFile("${env.WORKSPACE}/build-params.env")
                 }
             }
         }
