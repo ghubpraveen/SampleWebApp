@@ -100,6 +100,7 @@ pipeline {
         }
         failure {
             echo "❌ Build FAILED — Check console output above"
+            }
         }
     }
-}
+                
