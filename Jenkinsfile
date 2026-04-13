@@ -86,7 +86,13 @@ pipeline {
                     def destWar     = "${deployDir}/${destWarName}"
 
                     // Copy using Groovy file operations — no sh needed
-                    new File(destWar).bytes = new File(warFile).bytes
+                    fileOperations([
+                        
+                        fileCopyOperation(
+                            includes: warFile,
+                            targetLocation: destWar
+                        )
+                    ])
 
                     // Step 7 — Confirm copy worked
                     if (fileExists(destWar)) {
