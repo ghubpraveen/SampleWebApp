@@ -7,10 +7,11 @@ pipeline {
     
     
 
-    // environment {
-    //     PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
+    environment {
+        PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
+        DEPLOY_SCRIPT = "${WORKSPACE}/deploy.sh"
         
-    // }
+    }
 
     stages {
 
@@ -53,23 +54,44 @@ pipeline {
         }
 
         stage('3. Build WAR') {
+
             steps {
-                
-                echo "📦 Reading params and building WAR..."
-                sh """
-                    bash $DEPLOY_SCRIPT $PARAMS_FILE
-                """
-            }
-        }
-        
-        stage('4. Archive WAR') {
-            steps {
-                // Save the WAR as a Jenkins build artifact
-                archiveArtifacts artifacts: 'target/*.war', fingerprint: true
-                echo "✅ WAR archived successfully"
+
+                script {
+                    println "Before sh step"
+
+                    try {
+                        sh '''
+                            echo "Inside shell"
+                            whoami
+                            pwd
+                        '''
+                    } catch (e) {
+                        println "Shell failed: ${e}"
+                }
+
+                println "After sh step"
             }
         }
     }
+    //     stage('3. Build WAR') {
+    //         steps {
+                
+    //             echo "📦 Reading params and building WAR..."
+    //             sh """
+    //                 bash $DEPLOY_SCRIPT $PARAMS_FILE
+    //             """
+    //         }
+    //     }
+        
+    //     stage('4. Archive WAR') {
+    //         steps {
+    //             // Save the WAR as a Jenkins build artifact
+    //             archiveArtifacts artifacts: 'target/*.war', fingerprint: true
+    //             echo "✅ WAR archived successfully"
+    //         }
+    //     }
+    // }
 
     post {
         success {
