@@ -66,7 +66,7 @@ pipeline {
                 }
             }
         }
-
+    }
     post{
         success {
             echo "🎉 Build SUCCESS - Branch : ${env.Branch} | Commit: ${env.COMMIT_HASH}"
@@ -77,4 +77,3 @@ pipeline {
     }
    
 }
-
