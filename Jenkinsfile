@@ -60,7 +60,7 @@ pipeline {
                             pwd
                         '''    
                     } catch (e) {
-                        println "Shell failed: $(e)"
+                        println "Shell failed: ${e}"
                     }
                     println "After sh step"
                 }
