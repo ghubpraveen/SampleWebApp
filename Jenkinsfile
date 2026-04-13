@@ -1,12 +1,7 @@
 pipeline {
     agent any
 
-    // triggers {
-    //     pollSCM('* * * * *')
-    // }
     
-    
-
     environment {
         PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
         DEPLOY_SCRIPT = "${WORKSPACE}/deploy.sh"
@@ -53,10 +48,8 @@ pipeline {
             }
         }
 
-        stage('3. Build WAR') {
-
+        stage('3. Sample sh') {
             steps {
-
                 script {
                     println "Before sh step"
 
@@ -65,40 +58,23 @@ pipeline {
                             echo "Inside shell"
                             whoami
                             pwd
-                        '''
+                        '''    
                     } catch (e) {
-                        println "Shell failed: ${e}"
+                        println "Shell failed: $(e)"
+                    }
+                    println "After sh step"
                 }
-
-                println "After sh step"
             }
         }
-    }
-    //     stage('3. Build WAR') {
-    //         steps {
-                
-    //             echo "📦 Reading params and building WAR..."
-    //             sh """
-    //                 bash $DEPLOY_SCRIPT $PARAMS_FILE
-    //             """
-    //         }
-    //     }
-        
-    //     stage('4. Archive WAR') {
-    //         steps {
-    //             // Save the WAR as a Jenkins build artifact
-    //             archiveArtifacts artifacts: 'target/*.war', fingerprint: true
-    //             echo "✅ WAR archived successfully"
-    //         }
-    //     }
-    // }
 
-    post {
+    post{
         success {
-            echo "🎉 Build SUCCESS — Branch: ${env.BRANCH} | Commit: ${env.COMMIT_HASH}"
+            echo "🎉 Build SUCCESS - Branch : ${env.Branch} | Commit: ${env.COMMIT_HASH}"
         }
         failure {
-            echo "❌ Build FAILED — Check console output above"
+            echo "❌ Build FAILED - Check console output above"
         }
     }
+   
 }
+
