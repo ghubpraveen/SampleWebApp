@@ -1,16 +1,17 @@
 pipeline {
     agent any
 
-    triggers {
-        pollSCM('* * * * *')
-    }
-    
     // triggers {
-    //     githubPush()   // auto-triggers when code is pushed/merged
+    //     pollSCM('* * * * *')
     // }
+    
+    triggers {
+        githubPush()   // auto-triggers when code is pushed/merged
+    }
 
     environment {
         PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
+        
     }
 
     stages {
@@ -55,13 +56,9 @@ pipeline {
 
         stage('3. Build WAR') {
             steps {
-                sh """
-                    chmod +x ${env.WORKSPACE}/deploy.sh
-                    bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}
-                """
-
+                
                 echo "📦 Reading params and building WAR..."
-                sh "bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}"
+                sh ' ./${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}'
             }
         }
         stage('4. Archive WAR') {
