@@ -58,9 +58,12 @@ pipeline {
             steps {
                 
                 echo "📦 Reading params and building WAR..."
-                sh ' ./${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}'
+                sh """
+                    bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}
+                """
             }
         }
+        
         stage('4. Archive WAR') {
             steps {
                 // Save the WAR as a Jenkins build artifact
