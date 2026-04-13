@@ -1,18 +1,16 @@
 pipeline {
     agent any
 
-    // triggers {
-    //     pollSCM('* * * * *')
-    // }
-    
     triggers {
-        githubPush()   // auto-triggers when code is pushed/merged
+        pollSCM('* * * * *')
     }
+    
+    
 
-    environment {
-        PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
+    // environment {
+    //     PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
         
-    }
+    // }
 
     stages {
 
@@ -47,9 +45,9 @@ pipeline {
         stage('2. Write Params to File') {
             steps {
                 script {
-                    writeFile file: env.PARAMS_FILE, text: "JOB_NAME=${env.JOB_NAME}\nBRANCH=${env.BRANCH}\nCOMMIT_HASH=${env.COMMIT_HASH}\nBUILD_ENV=${env.BUILD_ENV}\nREQUIRED=${env.REQUIRED}\nBUILD_CAUSE=${env.BUILD_CAUSE}\nWORKSPACE=${env.WORKSPACE}\n"
+                    writeFile file: $PARAMS_FILE, text: "JOB_NAME=${env.JOB_NAME}\nBRANCH=${env.BRANCH}\nCOMMIT_HASH=${env.COMMIT_HASH}\nBUILD_ENV=${env.BUILD_ENV}\nREQUIRED=${env.REQUIRED}\nBUILD_CAUSE=${env.BUILD_CAUSE}\nWORKSPACE=${env.WORKSPACE}\n"
                     echo "Params written:"
-                    echo readFile(env.PARAMS_FILE)
+                    echo readFile($PARAMS_FILE)
                 }
             }
         }
@@ -59,7 +57,7 @@ pipeline {
                 
                 echo "📦 Reading params and building WAR..."
                 sh """
-                    bash ${env.WORKSPACE}/deploy.sh ${env.PARAMS_FILE}
+                    bash $DEPLOY_SCRIPT $PARAMS_FILE
                 """
             }
         }
