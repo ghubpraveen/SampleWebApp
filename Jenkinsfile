@@ -55,9 +55,12 @@ pipeline {
 
                     try {
                         sh '''
+                            set -x
+                            echo "Hello World"
                             echo "Inside shell"
-                            whoami
-                            pwd
+                            echo "User: $(whoami)"
+                            
+                            
                         '''    
                     } catch (e) {
                         println "Shell failed: ${e}"
