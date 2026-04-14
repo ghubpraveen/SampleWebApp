@@ -95,11 +95,19 @@ pipeline {
             }
         }
         
-        stage('4. Archive WAR') {
+        stage('4. Sleep'){
+            steps {
+                sh 'echo Hello'
+                sh 'sleep 30'
+            }
+        }
+
+
+        stage('5. Archive WAR') {
             steps {
                 // Save the WAR as a Jenkins build artifact
                 archiveArtifacts artifacts: 'target/*.war', fingerprint: true
-                
+
                 echo "✅ WAR archived successfully"
             }
         }
