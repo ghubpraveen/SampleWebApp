@@ -3,7 +3,7 @@ name: Build WAR
 on:
   push:
     branches:
-      - uat
+      - UAT
   workflow_dispatch:
 
 jobs:
