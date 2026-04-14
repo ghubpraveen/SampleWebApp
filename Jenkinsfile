@@ -14,7 +14,6 @@ pipeline {
     }
 
     stages {
-
         stage('0. Checkout') {
             steps {
                 checkout scm
@@ -111,7 +110,7 @@ pipeline {
     //             echo "✅ WAR archived successfully"
     //         }
     //     }
-    // }
+    }
 
     post {
         success {
