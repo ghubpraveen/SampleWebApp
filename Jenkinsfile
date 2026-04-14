@@ -84,32 +84,30 @@ pipeline {
     //     }
     // }
 
-        // stage('3. Build WAR') {
-        //     steps {
-                
-        //         echo "📦 Reading params and building WAR..."
-        //         sh """
-        //             bash $DEPLOY_SCRIPT $PARAMS_FILE
-        //         """
-        //     }
-        // }
-        
-        stage('4. Sleep') {
+       stage('3. Build WAR') {
             steps {
-                sh 'echo Hello'
-                sh 'sleep 30'
+                echo "📦 Reading params and building WAR..."
+                sh """
+                    /bin/sh <<EOF
+                    set -e
+                    set -x
+
+                    bash "$DEPLOY_SCRIPT" "$PARAMS_FILE"
+
+                    EOF
+                """
             }
         }
+        
+        
+        stage('4. Archive WAR') {
+            steps {
+                // Save the WAR as a Jenkins build artifact
+                archiveArtifacts artifacts: 'target/*.war', fingerprint: true
 
-
-    //     stage('5. Archive WAR') {
-    //         steps {
-    //             // Save the WAR as a Jenkins build artifact
-    //             archiveArtifacts artifacts: 'target/*.war', fingerprint: true
-
-    //             echo "✅ WAR archived successfully"
-    //         }
-    //     }
+                echo "✅ WAR archived successfully"
+            }
+        }
     }
 
     post {
