@@ -1,12 +1,16 @@
 pipeline {
     agent any
 
-    triggers {
-        pollSCM('* * * * *')
-    }
+    // triggers {
+    //     pollSCM('* * * * *')
+    // }
+    
+    
 
     environment {
         PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
+        DEPLOY_SCRIPT = "${WORKSPACE}/deploy.sh"
+        
     }
 
     stages {
@@ -26,11 +30,15 @@ pipeline {
                     env.REQUIRED    = 'Build'
                     env.BUILD_ENV   = 'uat'
 
-                    echo "BRANCH      : ${env.BRANCH}"
-                    echo "COMMIT_HASH : ${env.COMMIT_HASH}"
-                    echo "BUILD_CAUSE : ${env.BUILD_CAUSE}"
-                    echo "REQUIRED    : ${env.REQUIRED}"
-                    echo "BUILD_ENV   : ${env.BUILD_ENV}"
+                    echo """
+                    ======= Parameters Extracted =======
+                    BRANCH      : ${env.BRANCH}
+                    COMMIT_HASH : ${env.COMMIT_HASH}
+                    BUILD_CAUSE : ${env.BUILD_CAUSE}
+                    REQUIRED    : ${env.REQUIRED}
+                    BUILD_ENV   : ${env.BUILD_ENV}
+                    ====================================
+                    """
                 }
             }
         }
@@ -38,87 +46,70 @@ pipeline {
         stage('2. Write Params to File') {
             steps {
                 script {
-                    // Step 1 — Write params file
-                    writeFile file: env.PARAMS_FILE,
-                              text: "JOB_NAME=${env.JOB_NAME}\nBRANCH=${env.BRANCH}\nCOMMIT_HASH=${env.COMMIT_HASH}\nBUILD_ENV=${env.BUILD_ENV}\nREQUIRED=${env.REQUIRED}\nBUILD_CAUSE=${env.BUILD_CAUSE}\nWORKSPACE=${env.WORKSPACE}\n"
-
-                    // Step 2 — Verify params file written
-                    if (fileExists(env.PARAMS_FILE)) {
-                        echo "Params file written successfully"
-                        echo readFile(env.PARAMS_FILE)
-                    } else {
-                        error("Params file not found: ${env.PARAMS_FILE}")
-                    }
+                    writeFile file: env.PARAMS_FILE, text: "JOB_NAME=${env.JOB_NAME}\nBRANCH=${env.BRANCH}\nCOMMIT_HASH=${env.COMMIT_HASH}\nBUILD_ENV=${env.BUILD_ENV}\nREQUIRED=${env.REQUIRED}\nBUILD_CAUSE=${env.BUILD_CAUSE}\nWORKSPACE=${env.WORKSPACE}\n"
+                    echo "Params written:"
+                    echo readFile(env.PARAMS_FILE)
                 }
             }
         }
 
         stage('3. Build WAR') {
             steps {
-                script {
-                    // Step 3 — Print params (replaces bash echo block)
-                    echo "==============================="
-                    echo "JOB_NAME    : ${env.JOB_NAME}"
-                    echo "BRANCH      : ${env.BRANCH}"
-                    echo "COMMIT_HASH : ${env.COMMIT_HASH}"
-                    echo "BUILD_ENV   : ${env.BUILD_ENV}"
-                    echo "REQUIRED    : ${env.REQUIRED}"
-                    echo "WORKSPACE   : ${env.WORKSPACE}"
-                    echo "==============================="
-
-                    // Step 4 — Run Maven build
-                    // This is the only sh we cannot avoid
-                    echo "Starting Maven WAR build..."
-                    sh "cd ${env.WORKSPACE} && mvn clean package -DskipTests"
-
-                    // Step 5 — Confirm WAR was created (replaces bash if block)
-                    def warFile = "${env.WORKSPACE}/target/SampleWebApp.war"
-                    if (fileExists(warFile)) {
-                        echo "WAR built successfully: ${warFile}"
-                    } else {
-                        error("WAR file not found after build!")
-                    }
-
-                    // Step 6 — Copy WAR to deploy dir (replaces bash cp block)
-                    def shortHash   = env.COMMIT_HASH.take(7)
-                    def deployDir   = "/home/praveen/app_scripts"
-                    def destWarName = "SampleWebApp-${shortHash}.war"
-                    def destWar     = "${deployDir}/${destWarName}"
-
-                    // Copy using Groovy file operations — no sh needed
-                    fileOperations([
-                        
-                        fileCopyOperation(
-                            includes: warFile,
-                            targetLocation: destWar
-                        )
-                    ])
-
-                    // Step 7 — Confirm copy worked
-                    if (fileExists(destWar)) {
-                        echo "WAR copied successfully to: ${destWar}"
-                    } else {
-                        error("WAR copy failed!")
-                    }
-                }
+                sh(script: """
+                    echo "Inside Shell"
+                    whoami
+                    pwd
+                    """, shell: '/bin/sh')
             }
         }
 
+    //     stage('3. Build WAR') {
+
+    //         steps {
+
+    //             script {
+    //                 println "Before sh step"
+
+    //                 try {
+    //                     sh("""
+    //                         echo "Inside shell"
+    //                         whoami
+    //                         pwd
+    //                     ''', shell: '/bin/sh')
+    //                 } catch (e) {
+    //                     println "Shell failed: ${e}"
+    //             }
+
+    //             println "After sh step"
+    //         }
+    //     }
+    // }
+
+        // stage('3. Build WAR') {
+        //     steps {
+                
+        //         echo "📦 Reading params and building WAR..."
+        //         sh(script: """
+        //             bash $DEPLOY_SCRIPT $PARAMS_FILE
+        //         """, shell: '/bin/sh')
+        //     }
+        // }
+        
         stage('4. Archive WAR') {
             steps {
-                archiveArtifacts artifacts: 'target/*.war',
-                                 fingerprint: true
-                echo "WAR archived successfully"
+                // Save the WAR as a Jenkins build artifact
+                archiveArtifacts artifacts: 'target/*.war', fingerprint: true
+                echo "✅ WAR archived successfully"
             }
         }
     }
 
     post {
         success {
-            echo "SUCCESS - Branch: ${env.BRANCH} | Commit: ${env.COMMIT_HASH}"
+            echo "🎉 Build SUCCESS — Branch: ${env.BRANCH} | Commit: ${env.COMMIT_HASH}"
         }
         failure {
-            echo "FAILED - Check console output"
+            echo "❌ Build FAILED — Check console output above"
         }
     }
 }
