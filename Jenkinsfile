@@ -95,7 +95,7 @@ pipeline {
         //     }
         // }
         
-        stage('4. Sleep'){
+        stage('4. Sleep') {
             steps {
                 sh 'echo Hello'
                 sh 'sleep 30'
