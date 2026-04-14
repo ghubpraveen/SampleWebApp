@@ -53,15 +53,15 @@ pipeline {
             }
         }
 
-        stage('3. Build WAR') {
-            steps {
-                sh(script: """
-                    echo "Inside Shell"
-                    whoami
-                    pwd
-                    """, shell: '/bin/sh')
-            }
-        }
+        // stage('3. Build WAR') {
+        //     steps {
+        //         sh(script: """
+        //             echo "Inside Shell"
+        //             whoami
+        //             pwd
+        //             """, shell: '/bin/sh')
+        //     }
+        // }
 
     //     stage('3. Build WAR') {
 
@@ -85,15 +85,15 @@ pipeline {
     //     }
     // }
 
-        // stage('3. Build WAR') {
-        //     steps {
+        stage('3. Build WAR') {
+            steps {
                 
-        //         echo "📦 Reading params and building WAR..."
-        //         sh(script: """
-        //             bash $DEPLOY_SCRIPT $PARAMS_FILE
-        //         """, shell: '/bin/sh')
-        //     }
-        // }
+                echo "📦 Reading params and building WAR..."
+                sh """
+                    bash $DEPLOY_SCRIPT $PARAMS_FILE
+                """
+            }
+        }
         
         stage('4. Archive WAR') {
             steps {
