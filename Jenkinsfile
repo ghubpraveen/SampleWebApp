@@ -99,6 +99,7 @@ pipeline {
             steps {
                 // Save the WAR as a Jenkins build artifact
                 archiveArtifacts artifacts: 'target/*.war', fingerprint: true
+                
                 echo "✅ WAR archived successfully"
             }
         }
