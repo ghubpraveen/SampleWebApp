@@ -7,6 +7,12 @@ pipeline {
         githubPush()
     }
 
+    parameters {
+        string(name: 'BRANCH', defaultValue: '', description: 'Git branch to deploy')
+        choice(name: 'BUILD_ENV', choices: ['uat', 'stage', 'prod'], description: 'Target environment')
+        choice(name: 'REQUIRED', choices: ['Build', 'Files_Copy', 'Build_And_Files_Copy'], description: 'Action')
+    }
+
     environment {
         PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
     }
@@ -19,14 +25,28 @@ pipeline {
             }
         }
 
+        stage('Validate Input') {
+            steps {
+                script {
+                    if (!params.BRANCH || !params.BUILD_ENV) {
+                        error "❌ Missing BRANCH or BUILD_ENV"
+                    }
+
+                    echo "🚀 Branch: ${params.BRANCH}"
+                    echo "🌍 Env: ${params.BUILD_ENV}"
+                    echo "⚙️ Action: ${params.REQUIRED}"
+                }
+            }
+        }
+
         stage('Prepare Params') {
             steps {
                 script {
-                    env.BRANCH       = env.GIT_BRANCH?.replaceAll('origin/', '') ?: 'master'
+                    env.BRANCH       = params.BRANCH
                     env.COMMIT_HASH  = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
 
-                    env.REQUIRED     = "Build"
-                    env.BUILD_ENV    = "uat"
+                    env.REQUIRED     = params.REQUIRED
+                    env.BUILD_ENV    = params.Env
                 }
 
                 writeFile file: env.PARAMS_FILE, text: """\
@@ -42,7 +62,7 @@ WORKSPACE=${env.WORKSPACE}
 
         stage('Run Deployment') {
             steps {
-                deploy("${env.PARAMS_FILE}")   // ✅ THIS is correct usage
+                deploy("${env.PARAMS_FILE}")   
             }
         }
     }
