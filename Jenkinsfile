@@ -42,11 +42,11 @@ pipeline {
         stage('Prepare Params') {
             steps {
                 script {
-                    env.BRANCH       = params.BRANCH
+                    env.BRANCH       = params.BRANCH ?: env.GIT_BRANCH?.replaceAll('origin/', '')
                     env.COMMIT_HASH  = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
 
                     env.REQUIRED     = params.REQUIRED
-                    env.BUILD_ENV    = params.Env
+                    env.BUILD_ENV    = params.BUILD_ENV
                 }
 
                 writeFile file: env.PARAMS_FILE, text: """\
