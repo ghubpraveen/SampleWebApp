@@ -45,7 +45,7 @@ else
     exit 1
 fi
 
-DEPLOY_DIR="/home/praveen/app_scripts/"
+DEPLOY_DIR="$WORKSPACE/app_scripts/"
 cp "$WAR_FILE" "$DEPLOY_DIR/SampleWebAPP-${COMMIT_HASH:0:7}.war"
 
 if [[ -f "$DEPLOY_DIR/SampleWebAPP-${COMMIT_HASH:0:7}.war" ]]; then
