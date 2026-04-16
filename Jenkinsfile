@@ -8,9 +8,9 @@ pipeline {
     }
 
     parameters {
-        string(name: 'BRANCH', defaultValue: '', description: 'Git branch to deploy')
-        choice(name: 'BUILD_ENV', choices: ['uat', 'stage', 'prod'], description: 'Target environment')
-        choice(name: 'REQUIRED', choices: ['Build', 'Files_Copy', 'Build_And_Files_Copy'], description: 'Action')
+        string(name: 'BRANCH', defaultValue: '', description: 'Git branch')
+        choice(name: 'BUILD_ENV', choices: ['uat', 'stage', 'prod'], description: 'Environment')
+        choice(name: 'REQUIRED', choices: ['Build', 'Deploy'], description: 'Action')
     }
 
     environment {
