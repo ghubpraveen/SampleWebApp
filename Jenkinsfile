@@ -18,15 +18,11 @@ pipeline {
 
     stages {
 
+        // ✅ ALWAYS checkout first
         stage('Checkout') {
-            when {
-                expression {
-                    return sh(script: "git log -1 --pretty=%B", returnStdout: true).contains("Merge pull request")
-                }
-            }
             steps {
                 script {
-                    def branchToBuild = params.BRANCH ?: env.GIT_BRANCH.replaceAll('origin/', '')
+                    def branchToBuild = params.BRANCH ?: (env.GIT_BRANCH?.replaceAll('origin/', '') ?: 'UAT')
 
                     echo "📥 Checking out branch: ${branchToBuild}"
 
@@ -35,20 +31,16 @@ pipeline {
                         branches: [[name: "*/${branchToBuild}"]],
                         userRemoteConfigs: [[url: env.GIT_URL]]
                     ])
+
+                    env.BRANCH = branchToBuild
                 }
             }
         }
 
-        stage('Detect PR & ENV') {
+        // ✅ Proper merge filtering
+        stage('Check Merge Commit') {
             steps {
                 script {
-                    // Get commit hash
-                    env.COMMIT_HASH = sh(
-                        script: 'git rev-parse HEAD',
-                        returnStdout: true
-                    ).trim()
-
-                    // Get commit message
                     def commitMsg = sh(
                         script: "git log -1 --pretty=%B",
                         returnStdout: true
@@ -56,7 +48,33 @@ pipeline {
 
                     echo "📝 Commit Message: ${commitMsg}"
 
-                    // Extract PR number (works for GitHub merge commits)
+                    if (!commitMsg.contains("Merge pull request")) {
+                        echo "⛔ Not a merge commit → skipping pipeline"
+                        currentBuild.result = 'NOT_BUILT'
+                        error("Stopping pipeline (not a merge commit)")
+                    }
+
+                    echo "✅ Merge commit detected"
+                }
+            }
+        }
+
+        stage('Detect PR & ENV') {
+            steps {
+                script {
+                    // Commit hash
+                    env.COMMIT_HASH = sh(
+                        script: 'git rev-parse HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    // Commit message
+                    def commitMsg = sh(
+                        script: "git log -1 --pretty=%B",
+                        returnStdout: true
+                    ).trim()
+
+                    // Extract PR number
                     def matcher = commitMsg =~ /#(\\d+)/
                     def prNumber = matcher ? matcher[0][1] : null
 
@@ -64,9 +82,9 @@ pipeline {
                         error "❌ Could not extract PR number from merge commit"
                     }
 
-                    echo "🔎 Detected PR #: ${prNumber}"
+                    echo "🔎 PR #: ${prNumber}"
 
-                    // Get repo info
+                    // Repo info
                     def gitUrl = sh(
                         script: "git config --get remote.origin.url",
                         returnStdout: true
@@ -74,15 +92,13 @@ pipeline {
 
                     def repo = gitUrl.tokenize('/').takeRight(2).join('/').replace('.git','')
 
-                    // Call GitHub API
+                    // GitHub API
                     def apiUrl = "https://api.github.com/repos/${repo}/issues/${prNumber}"
 
                     def response = sh(
                         script: "curl -s ${apiUrl}",
                         returnStdout: true
                     ).trim()
-
-                    echo "DEBUG → API Response: ${response}"
 
                     def json = readJSON text: response
 
@@ -92,7 +108,7 @@ pipeline {
                     echo "🏷️ Labels: ${labels}"
                     echo "📄 Description: ${body}"
 
-                    // Determine BUILD_ENV
+                    // Resolve env
                     def resolvedEnv = null
 
                     if (labels.contains('uat')) {
@@ -108,7 +124,7 @@ pipeline {
                     } else if (body.contains('prod')) {
                         resolvedEnv = 'prod'
                     } else {
-                        error "❌ No BUILD_ENV found in labels or PR description"
+                        error "❌ No BUILD_ENV found"
                     }
 
                     env.BUILD_ENV = resolvedEnv
@@ -144,7 +160,6 @@ WORKSPACE=${env.WORKSPACE}
         }
     }
 }
-
 
 
 
