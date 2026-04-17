@@ -19,9 +19,14 @@ pipeline {
     stages {
 
         stage('Checkout') {
+            when {
+                expression {
+                    return sh(script: "git log -1 --pretty=%B", returnStdout: true).contains("Merge pull request")
+                }
+            }
             steps {
                 script {
-                    def branchToBuild = params.BRANCH ?: 'master'
+                    def branchToBuild = params.BRANCH ?: env.GIT_BRANCH.replaceAll('origin/', '')
 
                     echo "📥 Checking out branch: ${branchToBuild}"
 
@@ -30,8 +35,6 @@ pipeline {
                         branches: [[name: "*/${branchToBuild}"]],
                         userRemoteConfigs: [[url: env.GIT_URL]]
                     ])
-
-                    env.BRANCH = branchToBuild
                 }
             }
         }
