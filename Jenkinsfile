@@ -19,10 +19,11 @@ pipeline {
     stages {
 
         // ✅ ALWAYS checkout first
+        // ✅ ALWAYS checkout first
         stage('Checkout') {
             steps {
                 script {
-                    def branchToBuild = params.BRANCH ?: (env.GIT_BRANCH?.replaceAll('origin/', '')
+                    def branchToBuild = params.BRANCH ?: (env.GIT_BRANCH?.replaceAll('origin/', '') ?: 'main')
 
                     echo "📥 Checking out branch: ${branchToBuild}"
 
@@ -62,94 +63,60 @@ pipeline {
         stage('Detect PR & ENV') {
             steps {
                 script {
-                    // Commit hash
+
                     env.COMMIT_HASH = sh(
                         script: 'git rev-parse HEAD',
                         returnStdout: true
                     ).trim()
 
-                    // Commit message
                     def commitMsg = sh(
                         script: "git log -1 --pretty=%B",
                         returnStdout: true
                     ).trim()
 
-                    // Extract PR number
-                    def matcher = commitMsg =~ /#(\\d+)/
-                    def prNumber = matcher ? matcher[0][1] : null
+                    echo "📝 Commit Message:\n${commitMsg}"
+
+                    // ✅ Extract PR number
+                    def prMatcher = (commitMsg =~ /#(\d+)/)
+                    def prNumber = prMatcher.find() ? prMatcher[0][1] : null
 
                     if (!prNumber) {
-                        error "❌ Could not extract PR number from merge commit"
-                    }
-
-                    echo "🔎 PR #: ${prNumber}"
-
-                    // Repo info
-                    def gitUrl = sh(
-                        script: "git config --get remote.origin.url",
-                        returnStdout: true
-                    ).trim()
-
-                    def repo = gitUrl.tokenize('/').takeRight(2).join('/').replace('.git','')
-
-                    // GitHub API
-                    def apiUrl = "https://api.github.com/repos/${repo}/issues/${prNumber}"
-
-                    def response = sh(
-                        script: "curl -s ${apiUrl}",
-                        returnStdout: true
-                    ).trim()
-
-                    def json = readJSON text: response
-
-                    def labels = json.labels.collect { it.name.toLowerCase() }
-                    def body   = (json.body ?: "").toLowerCase()
-
-                    echo "🏷️ Labels: ${labels}"
-                    echo "📄 Description: ${body}"
-
-                    // Resolve env
-                    def resolvedEnv = null
-
-                    if (labels.contains('uat')) {
-                        resolvedEnv = 'uat'
-                    } else if (labels.contains('stage')) {
-                        resolvedEnv = 'stage'
-                    } else if (labels.contains('prod')) {
-                        resolvedEnv = 'prod'
-                    } else if (body.contains('uat')) {
-                        resolvedEnv = 'uat'
-                    } else if (body.contains('stage')) {
-                        resolvedEnv = 'stage'
-                    } else if (body.contains('prod')) {
-                        resolvedEnv = 'prod'
+                        echo "⚠️ PR number not found (possible squash merge)"
                     } else {
-                        error "❌ No BUILD_ENV found"
+                        echo "🔎 PR #: ${prNumber}"
                     }
 
-                    env.BUILD_ENV = resolvedEnv
+                    // ✅ Extract BUILD_ENV from commit message
+                    def envMatcher = (commitMsg =~ /BUILD_ENV\s*=\s*(\w+)/i)
+                    def buildEnv = envMatcher.find() ? envMatcher[0][1].toLowerCase() : null
+
+                    if (!buildEnv) {
+                        error "❌ BUILD_ENV not found in commit message"
+                    }
+
+                    env.BUILD_ENV = buildEnv
                     env.REQUIRED  = params.REQUIRED
 
                     echo """
-===============================
-JOB_NAME    : ${env.JOB_NAME}
-BRANCH      : ${env.BRANCH}
-COMMIT_HASH : ${env.COMMIT_HASH}
-BUILD_ENV   : ${env.BUILD_ENV}
-REQUIRED    : ${env.REQUIRED}
-WORKSPACE   : ${env.WORKSPACE}
-===============================
-"""
+        ===============================
+        JOB_NAME    : ${env.JOB_NAME}
+        BRANCH      : ${env.BRANCH}
+        COMMIT_HASH : ${env.COMMIT_HASH}
+        BUILD_ENV   : ${env.BUILD_ENV}
+        REQUIRED    : ${env.REQUIRED}
+        WORKSPACE   : ${env.WORKSPACE}
+        ===============================
+        """
                 }
 
                 writeFile file: env.PARAMS_FILE, text: """\
-JOB_NAME=${env.JOB_NAME}
-BRANCH=${env.BRANCH}
-COMMIT_HASH=${env.COMMIT_HASH}
-BUILD_ENV=${env.BUILD_ENV}
-REQUIRED=${env.REQUIRED}
-WORKSPACE=${env.WORKSPACE}
-"""
+        JOB_NAME=${env.JOB_NAME}
+        BRANCH=${env.BRANCH}
+        COMMIT_HASH=${env.COMMIT_HASH}
+        BUILD_ENV=${env.BUILD_ENV}
+        REQUIRED=${env.REQUIRED}
+        WORKSPACE=${env.WORKSPACE}
+        """
             }
         }
 
