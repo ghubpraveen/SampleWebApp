@@ -3,9 +3,9 @@
 pipeline {
     agent any
 
-    triggers {
-        githubPush()
-    }
+    // triggers {
+    //     githubPush()
+    // }
 
     parameters {
         string(name: 'BRANCH', defaultValue: '', description: 'Branch (optional)')
