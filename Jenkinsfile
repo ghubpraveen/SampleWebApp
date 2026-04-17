@@ -9,6 +9,7 @@ pipeline {
 
     parameters {
         string(name: 'BRANCH', defaultValue: '', description: 'Git branch')
+        string(name: 'PR_NUMBER', defaultValue: '', description: 'Pull Request Number')
         choice(name: 'BUILD_ENV', choices: ['uat', 'stage', 'prod'], description: 'Environment')
         choice(name: 'REQUIRED', choices: ['Build', 'Deploy'], description: 'Action')
     }
@@ -17,13 +18,24 @@ pipeline {
         PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
     }
 
-    stages {
+    stages  {
 
         stage('Checkout') {
             steps {
-                checkout scm
+                script {
+                        
+                    def branchToBuild = params.BRANCH ?: 'master'
+
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "*/${branchToBuild}"]],
+                        userRemoteConfigs: [[url: env.GIT_URL]]
+                    ])
+
+                    env.BRANCH = branchToBuild
+                    }
+                }
             }
-        }
 
         stage('Validate Input') {
             steps {
@@ -42,21 +54,68 @@ pipeline {
         stage('Prepare Params') {
             steps {
                 script {
-                    env.BRANCH       = params.BRANCH ?: env.GIT_BRANCH?.replaceAll('origin/', '')
-                    env.COMMIT_HASH  = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    // Basic values
+                    env.BRANCH      = params.BRANCH ?: env.GIT_BRANCH?.replaceAll('origin/', '')
+                    env.COMMIT_HASH = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    env.REQUIRED    = params.REQUIRED
 
-                    env.REQUIRED     = params.REQUIRED
-                    env.BUILD_ENV    = params.BUILD_ENV
+                    // Default fallback
+                    def resolvedEnv = params.BUILD_ENV
+
+                    // If PR_NUMBER is provided → fetch labels
+                    if (params.PR_NUMBER?.trim()) {
+                        echo "Fetching labels for PR #${params.PR_NUMBER}"
+                        echo "DEBUG → PR_NUMBER = '${params.PR_NUMBER}'"
+
+                        def gitUrl = env.GIT_URL
+                        def repo = gitUrl.tokenize('/').takeRight(2).join('/').replace('.git','')
+                        def apiUrl = "https://api.github.com/repos/${repo}/issues/${params.PR_NUMBER}"
+
+                        def response = sh(
+                            script: """curl -s ${apiUrl}""",
+                            returnStdout: true
+                        ).trim()
+                        echo "DEBUG → API Response = ${response}"
+                        def json = readJSON text: response
+
+                        def labels = json.labels.collect { it.name.toLowerCase() }
+                        echo "PR Labels: ${labels}"
+
+                        // Decide BUILD_ENV from labels
+                        if (labels.contains('uat')) {
+                            resolvedEnv = 'uat'
+                        } else if (labels.contains('stage')) {
+                            resolvedEnv = 'stage'
+                        } else if (labels.contains('prod')) {
+                            resolvedEnv = 'prod'
+                        } else {
+                            error "❌ No valid env label (uat/stage/prod) found on PR"
+                        }
+                    } else {
+                        echo "No PR_NUMBER provided, using parameter BUILD_ENV"
+                    }
+
+                    env.BUILD_ENV = resolvedEnv
+
+                    echo """
+        ===============================
+        JOB_NAME    : ${env.JOB_NAME}
+        BRANCH      : ${env.BRANCH}
+        COMMIT_HASH : ${env.COMMIT_HASH}
+        BUILD_ENV   : ${env.BUILD_ENV}
+        REQUIRED    : ${env.REQUIRED}
+        WORKSPACE   : ${env.WORKSPACE}
+        ===============================
+        """
                 }
-
                 writeFile file: env.PARAMS_FILE, text: """\
-JOB_NAME=${env.JOB_NAME}
-BRANCH=${env.BRANCH}
-COMMIT_HASH=${env.COMMIT_HASH}
-BUILD_ENV=${env.BUILD_ENV}
-REQUIRED=${env.REQUIRED}
-WORKSPACE=${env.WORKSPACE}
-"""
+        JOB_NAME=${env.JOB_NAME}
+        BRANCH=${env.BRANCH}
+        COMMIT_HASH=${env.COMMIT_HASH}
+        BUILD_ENV=${env.BUILD_ENV}
+        REQUIRED=${env.REQUIRED}
+        WORKSPACE=${env.WORKSPACE}
+        """
             }
         }
 
