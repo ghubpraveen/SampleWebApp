@@ -87,7 +87,7 @@ pipeline {
                     }
 
                     // ✅ Extract BUILD_ENV from commit message
-                    def envMatcher = (commitMsg =~ /BUILD_ENV\s*=\s*(\w+)/i)
+                    def envMatcher = (commitMsg =~ /(?i)BUILD_ENV\s*=\s*(\w+)/)
                     def buildEnv = envMatcher.find() ? envMatcher[0][1].toLowerCase() : null
 
                     if (!buildEnv) {
