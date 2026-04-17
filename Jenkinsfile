@@ -19,6 +19,7 @@ pipeline {
     stages {
 
         // ✅ ALWAYS checkout first
+        // ✅ ALWAYS checkout first
         stage('Checkout') {
             steps {
                 script {
