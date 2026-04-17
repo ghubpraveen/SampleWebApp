@@ -23,7 +23,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 script {
-                    def branchToBuild = params.BRANCH ?: (env.GIT_BRANCH?.replaceAll('origin/', ''))
+                    def branchToBuild = params.BRANCH ?: (env.GIT_BRANCH?.replaceAll('origin/', '') ?: 'main')
 
                     echo "📥 Checking out branch: ${branchToBuild}"
 
