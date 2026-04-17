@@ -22,7 +22,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 script {
-                    def branchToBuild = params.BRANCH ?: (env.GIT_BRANCH?.replaceAll('origin/', '') ?: 'UAT')
+                    def branchToBuild = params.BRANCH ?: (env.GIT_BRANCH?.replaceAll('origin/', '')
 
                     echo "📥 Checking out branch: ${branchToBuild}"
 
