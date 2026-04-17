@@ -37,7 +37,7 @@ pipeline {
             }
         }
 
-        // ✅ Proper merge filtering
+        // ✅ Merge filtering
         stage('Check Merge Commit') {
             steps {
                 script {
