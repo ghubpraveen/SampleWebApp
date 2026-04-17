@@ -1,15 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
 @Library('cicd-library') _
 
 pipeline {
@@ -20,9 +8,7 @@ pipeline {
     }
 
     parameters {
-        string(name: 'BRANCH', defaultValue: '', description: 'Git branch')
-        string(name: 'PR_NUMBER', defaultValue: '', description: 'Pull Request Number')
-        choice(name: 'BUILD_ENV', choices: ['stage', 'uat', 'prod'], description: 'Environment (fallback)')
+        string(name: 'BRANCH', defaultValue: '', description: 'Branch (optional)')
         choice(name: 'REQUIRED', choices: ['Build', 'Deploy'], description: 'Action')
     }
 
@@ -42,7 +28,7 @@ pipeline {
                     checkout([
                         $class: 'GitSCM',
                         branches: [[name: "*/${branchToBuild}"]],
-                        userRemoteConfigs: [[url: scm.userRemoteConfigs[0].url]]
+                        userRemoteConfigs: [[url: env.GIT_URL]]
                     ])
 
                     env.BRANCH = branchToBuild
@@ -50,79 +36,80 @@ pipeline {
             }
         }
 
-        stage('Validate Input') {
+        stage('Detect PR & ENV') {
             steps {
                 script {
-                    echo "DEBUG → PR_NUMBER raw = '${params.PR_NUMBER}'"
+                    // Get commit hash
+                    env.COMMIT_HASH = sh(
+                        script: 'git rev-parse HEAD',
+                        returnStdout: true
+                    ).trim()
 
-                    if (!params.BRANCH) {
-                        error "❌ Missing BRANCH"
+                    // Get commit message
+                    def commitMsg = sh(
+                        script: "git log -1 --pretty=%B",
+                        returnStdout: true
+                    ).trim()
+
+                    echo "📝 Commit Message: ${commitMsg}"
+
+                    // Extract PR number (works for GitHub merge commits)
+                    def matcher = commitMsg =~ /#(\\d+)/
+                    def prNumber = matcher ? matcher[0][1] : null
+
+                    if (!prNumber) {
+                        error "❌ Could not extract PR number from merge commit"
                     }
 
-                    if (!params.PR_NUMBER?.trim() && !params.BUILD_ENV) {
-                        error "❌ Either PR_NUMBER or BUILD_ENV must be provided"
-                    }
+                    echo "🔎 Detected PR #: ${prNumber}"
 
-                    echo "🚀 Branch: ${params.BRANCH}"
-                    echo "⚙️ Action: ${params.REQUIRED}"
-                }
-            }
-        }
+                    // Get repo info
+                    def gitUrl = sh(
+                        script: "git config --get remote.origin.url",
+                        returnStdout: true
+                    ).trim()
 
-        stage('Prepare Params') {
-            steps {
-                script {
+                    def repo = gitUrl.tokenize('/').takeRight(2).join('/').replace('.git','')
 
-                    // Basic values
-                    env.COMMIT_HASH = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                    env.REQUIRED    = params.REQUIRED
+                    // Call GitHub API
+                    def apiUrl = "https://api.github.com/repos/${repo}/issues/${prNumber}"
 
-                    def resolvedEnv = params.BUILD_ENV
+                    def response = sh(
+                        script: "curl -s ${apiUrl}",
+                        returnStdout: true
+                    ).trim()
 
-                    // If PR_NUMBER is provided → fetch labels
-                    if (params.PR_NUMBER?.trim()) {
+                    echo "DEBUG → API Response: ${response}"
 
-                        echo "🔎 Fetching labels for PR #${params.PR_NUMBER}"
+                    def json = readJSON text: response
 
-                        // Get repo dynamically
-                        def gitUrl = sh(
-                            script: "git config --get remote.origin.url",
-                            returnStdout: true
-                        ).trim()
+                    def labels = json.labels.collect { it.name.toLowerCase() }
+                    def body   = (json.body ?: "").toLowerCase()
 
-                        def repo = gitUrl.tokenize('/').takeRight(2).join('/').replace('.git','')
+                    echo "🏷️ Labels: ${labels}"
+                    echo "📄 Description: ${body}"
 
-                        def apiUrl = "https://api.github.com/repos/${repo}/issues/${params.PR_NUMBER}"
+                    // Determine BUILD_ENV
+                    def resolvedEnv = null
 
-                        def response = sh(
-                            script: "curl -s ${apiUrl}",
-                            returnStdout: true
-                        ).trim()
-
-                        echo "DEBUG → API Response: ${response}"
-
-                        def json = readJSON text: response
-
-                        def labels = json.labels.collect { it.name.toLowerCase() }
-
-                        echo "🏷️ PR Labels: ${labels}"
-
-                        // Decide BUILD_ENV
-                        if (labels.contains('uat')) {
-                            resolvedEnv = 'uat'
-                        } else if (labels.contains('stage')) {
-                            resolvedEnv = 'stage'
-                        } else if (labels.contains('prod')) {
-                            resolvedEnv = 'prod'
-                        } else {
-                            error "❌ No valid env label (uat/stage/prod) found on PR"
-                        }
-
+                    if (labels.contains('uat')) {
+                        resolvedEnv = 'uat'
+                    } else if (labels.contains('stage')) {
+                        resolvedEnv = 'stage'
+                    } else if (labels.contains('prod')) {
+                        resolvedEnv = 'prod'
+                    } else if (body.contains('uat')) {
+                        resolvedEnv = 'uat'
+                    } else if (body.contains('stage')) {
+                        resolvedEnv = 'stage'
+                    } else if (body.contains('prod')) {
+                        resolvedEnv = 'prod'
                     } else {
-                        echo "ℹ️ No PR_NUMBER → using BUILD_ENV parameter"
+                        error "❌ No BUILD_ENV found in labels or PR description"
                     }
 
                     env.BUILD_ENV = resolvedEnv
+                    env.REQUIRED  = params.REQUIRED
 
                     echo """
 ===============================
@@ -165,14 +152,150 @@ WORKSPACE=${env.WORKSPACE}
 
 
 
+// @Library('cicd-library') _
 
+// pipeline {
+//     agent any
 
+//     triggers {
+//         githubPush()
+//     }
 
+//     parameters {
+//         string(name: 'BRANCH', defaultValue: '', description: 'Git branch')
+//         string(name: 'PR_NUMBER', defaultValue: '', description: 'Pull Request Number')
+//         choice(name: 'BUILD_ENV', choices: ['stage', 'uat', 'prod'], description: 'Environment (fallback)')
+//         choice(name: 'REQUIRED', choices: ['Build', 'Deploy'], description: 'Action')
+//     }
 
+//     environment {
+//         PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
+//     }
 
+//     stages {
 
+//         stage('Checkout') {
+//             steps {
+//                 script {
+//                     def branchToBuild = params.BRANCH ?: 'master'
 
+//                     echo "📥 Checking out branch: ${branchToBuild}"
 
+//                     checkout([
+//                         $class: 'GitSCM',
+//                         branches: [[name: "*/${branchToBuild}"]],
+//                         userRemoteConfigs: [[url: scm.userRemoteConfigs[0].url]]
+//                     ])
+
+//                     env.BRANCH = branchToBuild
+//                 }
+//             }
+//         }
+
+//         stage('Validate Input') {
+//             steps {
+//                 script {
+//                     echo "DEBUG → PR_NUMBER raw = '${params.PR_NUMBER}'"
+
+//                     if (!params.BRANCH) {
+//                         error "❌ Missing BRANCH"
+//                     }
+
+//                     if (!params.PR_NUMBER?.trim() && !params.BUILD_ENV) {
+//                         error "❌ Either PR_NUMBER or BUILD_ENV must be provided"
+//                     }
+
+//                     echo "🚀 Branch: ${params.BRANCH}"
+//                     echo "⚙️ Action: ${params.REQUIRED}"
+//                 }
+//             }
+//         }
+
+//         stage('Prepare Params') {
+//             steps {
+//                 script {
+
+//                     // Basic values
+//                     env.COMMIT_HASH = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+//                     env.REQUIRED    = params.REQUIRED
+
+//                     def resolvedEnv = params.BUILD_ENV
+
+//                     // If PR_NUMBER is provided → fetch labels
+//                     if (params.PR_NUMBER?.trim()) {
+
+//                         echo "🔎 Fetching labels for PR #${params.PR_NUMBER}"
+
+//                         // Get repo dynamically
+//                         def gitUrl = sh(
+//                             script: "git config --get remote.origin.url",
+//                             returnStdout: true
+//                         ).trim()
+
+//                         def repo = gitUrl.tokenize('/').takeRight(2).join('/').replace('.git','')
+
+//                         def apiUrl = "https://api.github.com/repos/${repo}/issues/${params.PR_NUMBER}"
+
+//                         def response = sh(
+//                             script: "curl -s ${apiUrl}",
+//                             returnStdout: true
+//                         ).trim()
+
+//                         echo "DEBUG → API Response: ${response}"
+
+//                         def json = readJSON text: response
+
+//                         def labels = json.labels.collect { it.name.toLowerCase() }
+
+//                         echo "🏷️ PR Labels: ${labels}"
+
+//                         // Decide BUILD_ENV
+//                         if (labels.contains('uat')) {
+//                             resolvedEnv = 'uat'
+//                         } else if (labels.contains('stage')) {
+//                             resolvedEnv = 'stage'
+//                         } else if (labels.contains('prod')) {
+//                             resolvedEnv = 'prod'
+//                         } else {
+//                             error "❌ No valid env label (uat/stage/prod) found on PR"
+//                         }
+
+//                     } else {
+//                         echo "ℹ️ No PR_NUMBER → using BUILD_ENV parameter"
+//                     }
+
+//                     env.BUILD_ENV = resolvedEnv
+
+//                     echo """
+// ===============================
+// JOB_NAME    : ${env.JOB_NAME}
+// BRANCH      : ${env.BRANCH}
+// COMMIT_HASH : ${env.COMMIT_HASH}
+// BUILD_ENV   : ${env.BUILD_ENV}
+// REQUIRED    : ${env.REQUIRED}
+// WORKSPACE   : ${env.WORKSPACE}
+// ===============================
+// """
+//                 }
+
+//                 writeFile file: env.PARAMS_FILE, text: """\
+// JOB_NAME=${env.JOB_NAME}
+// BRANCH=${env.BRANCH}
+// COMMIT_HASH=${env.COMMIT_HASH}
+// BUILD_ENV=${env.BUILD_ENV}
+// REQUIRED=${env.REQUIRED}
+// WORKSPACE=${env.WORKSPACE}
+// """
+//             }
+//         }
+
+//         stage('Run Deployment') {
+//             steps {
+//                 deploy("${env.PARAMS_FILE}")
+//             }
+//         }
+//     }
+// }
 
 
 
