@@ -25,7 +25,7 @@ pipeline {
             }
         }
 
-        stage('Validate Input') {
+        stage('Validate Inputis') {
             steps {
                 script {
                     if (!params.BRANCH || !params.BUILD_ENV) {
