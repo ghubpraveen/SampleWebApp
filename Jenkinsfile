@@ -3,9 +3,9 @@
 pipeline {
     agent any
 
-    // triggers {
-    //     githubPush()
-    // }
+    triggers {
+        githubPush()
+    }
 
     parameters {
         string(name: 'BRANCH', defaultValue: '', description: 'Branch (optional)')
@@ -37,7 +37,7 @@ pipeline {
             }
         }
 
-        // ✅ Proper merge filtering
+        // ✅ Merge filtering
         stage('Check Merge Commit') {
             steps {
                 script {
