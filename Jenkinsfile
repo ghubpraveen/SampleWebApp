@@ -4,7 +4,7 @@ pipeline {
     agent any
 
     options {
-        disableConcurrentBuilds()   // prevent parallel builds
+        disableConcurrentBuilds()
     }
 
     environment {
@@ -57,7 +57,7 @@ pipeline {
             steps {
                 script {
 
-                    // Commit info
+                    // Commit hash
                     env.COMMIT_HASH = sh(
                         script: 'git rev-parse HEAD',
                         returnStdout: true
@@ -68,7 +68,7 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    // ✅ Extract PR number safely (NO matcher object stored)
+                    // ✅ Extract PR number
                     def prNumber = null
                     def prMatch = (commitMsg =~ /#(\d+)/)
                     if (prMatch.find()) {
@@ -77,16 +77,16 @@ pipeline {
 
                     echo "🔎 PR #: ${prNumber ?: 'Not Found'}"
 
-                    // ✅ Extract BUILD_ENV from commit message
+                    // ✅ Extract BUILD_ENV from commit message (preserve case)
                     def buildEnv = null
                     def envMatch = (commitMsg =~ /(?i)BUILD_ENV\s*=\s*(\w+)/)
                     if (envMatch.find()) {
-                        buildEnv = envMatch.group(1).toLowerCase()
+                        buildEnv = envMatch.group(1)
                     }
 
-                    echo "📄 ENV from commit message: ${buildEnv ?: 'Not Found'}"
+                    echo "📄 ENV from commit: ${buildEnv ?: 'Not Found'}"
 
-                    // ✅ If not found → fallback to PR labels
+                    // ✅ Fallback → PR labels (preserve case)
                     if (!buildEnv && prNumber) {
 
                         def gitUrl = sh(
@@ -105,26 +105,29 @@ pipeline {
 
                         def json = readJSON text: response
 
-                        def labels = json.labels.collect { it.name.toLowerCase() }
+                        def labels = json.labels.collect { it.name }
 
                         echo "🏷️ Labels: ${labels}"
 
-                        if (labels.contains('uat')) {
-                            buildEnv = 'uat'
-                        } else if (labels.contains('stage')) {
-                            buildEnv = 'stage'
-                        } else if (labels.contains('prod')) {
-                            buildEnv = 'prod'
+                        def matchedLabel = labels.find {
+                            it.equalsIgnoreCase('uat') ||
+                            it.equalsIgnoreCase('stage') ||
+                            it.equalsIgnoreCase('prod') ||
+                            it.equalsIgnoreCase('atp')
+                        }
+
+                        if (matchedLabel) {
+                            buildEnv = matchedLabel
                         }
                     }
 
-                    // ❌ Fail if still not found
+                    // ❌ Fail if not found
                     if (!buildEnv) {
                         error "❌ BUILD_ENV not found in commit message or PR labels"
                     }
 
                     env.BUILD_ENV = buildEnv
-                    env.REQUIRED  = "Build"   // default behavior
+                    env.REQUIRED  = "Build"
 
                     echo """
 ===============================
@@ -137,18 +140,19 @@ WORKSPACE   : ${env.WORKSPACE}
 """
                 }
 
-                // ✅ Persist for shared library
+                // ✅ Persist params for shared library
                 writeFile file: env.PARAMS_FILE, text: """\
 JOB_NAME=${env.JOB_NAME}
 BRANCH=${env.BRANCH}
 COMMIT_HASH=${env.COMMIT_HASH}
 BUILD_ENV=${env.BUILD_ENV}
+REQUIRED=${env.REQUIRED}
 WORKSPACE=${env.WORKSPACE}
 """
             }
         }
 
-        // ✅ Execute shared library deployment
+        // ✅ Execute deployment (from shared library)
         stage('Run Deployment') {
             steps {
                 deploy("${env.PARAMS_FILE}")
