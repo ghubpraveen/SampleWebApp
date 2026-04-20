@@ -3,13 +3,17 @@
 pipeline {
     agent any
 
+    options {
+        disableConcurrentBuilds()   // prevent parallel builds
+    }
+
     environment {
         PARAMS_FILE = "${env.WORKSPACE}/build-params.env"
     }
 
     stages {
 
-        // ✅ Always checkout triggering branch
+        // ✅ Checkout triggered branch
         stage('Checkout') {
             steps {
                 script {
@@ -28,7 +32,7 @@ pipeline {
             }
         }
 
-        // ✅ Allow ONLY merge commits
+        // ✅ Allow only merge commits
         stage('Check Merge Commit') {
             steps {
                 script {
@@ -39,9 +43,8 @@ pipeline {
 
                     echo "📝 Commit Message:\n${commitMsg}"
 
-                    // ❗ IMPORTANT: no matcher stored → avoids serialization issue
-                    if (!(commitMsg.toLowerCase().contains("merge pull request") || commitMsg.contains("#"))) {
-                        error "⛔ Not a PR merge commit. Skipping pipeline."
+                    if (!commitMsg.toLowerCase().contains("merge pull request")) {
+                        error "⛔ Not a merge commit. Skipping build."
                     }
 
                     echo "✅ Merge commit detected"
@@ -49,45 +52,50 @@ pipeline {
             }
         }
 
-        // ✅ Detect PR + ENV
+        // ✅ Extract PR + BUILD_ENV
         stage('Detect PR & ENV') {
             steps {
                 script {
-                    // Commit hash
+
+                    // Commit info
                     env.COMMIT_HASH = sh(
                         script: 'git rev-parse HEAD',
                         returnStdout: true
                     ).trim()
 
-                    // Commit message
                     def commitMsg = sh(
                         script: "git log -1 --pretty=%B",
                         returnStdout: true
                     ).trim()
 
-                    echo "📝 Commit Message:\n${commitMsg}"
-
-                    // ✅ Extract PR number safely
+                    // ✅ Extract PR number safely (NO matcher object stored)
                     def prNumber = null
                     def prMatch = (commitMsg =~ /#(\d+)/)
                     if (prMatch.find()) {
                         prNumber = prMatch.group(1)
                     }
 
-                    echo "🔎 PR #: ${prNumber ?: 'Not found'}"
+                    echo "🔎 PR #: ${prNumber ?: 'Not Found'}"
 
-                    // ✅ Get repo dynamically
-                    def gitUrl = sh(
-                        script: "git config --get remote.origin.url",
-                        returnStdout: true
-                    ).trim()
+                    // ✅ Extract BUILD_ENV from commit message
+                    def buildEnv = null
+                    def envMatch = (commitMsg =~ /(?i)BUILD_ENV\s*=\s*(\w+)/)
+                    if (envMatch.find()) {
+                        buildEnv = envMatch.group(1).toLowerCase()
+                    }
 
-                    def repo = gitUrl.tokenize('/').takeRight(2).join('/').replace('.git','')
+                    echo "📄 ENV from commit message: ${buildEnv ?: 'Not Found'}"
 
-                    def resolvedEnv = null
+                    // ✅ If not found → fallback to PR labels
+                    if (!buildEnv && prNumber) {
 
-                    // ✅ Try PR labels
-                    if (prNumber) {
+                        def gitUrl = sh(
+                            script: "git config --get remote.origin.url",
+                            returnStdout: true
+                        ).trim()
+
+                        def repo = gitUrl.tokenize('/').takeRight(2).join('/').replace('.git','')
+
                         def apiUrl = "https://api.github.com/repos/${repo}/issues/${prNumber}"
 
                         def response = sh(
@@ -96,35 +104,27 @@ pipeline {
                         ).trim()
 
                         def json = readJSON text: response
+
                         def labels = json.labels.collect { it.name.toLowerCase() }
 
                         echo "🏷️ Labels: ${labels}"
 
                         if (labels.contains('uat')) {
-                            resolvedEnv = 'uat'
+                            buildEnv = 'uat'
                         } else if (labels.contains('stage')) {
-                            resolvedEnv = 'stage'
+                            buildEnv = 'stage'
                         } else if (labels.contains('prod')) {
-                            resolvedEnv = 'prod'
+                            buildEnv = 'prod'
                         }
                     }
 
-                    // ✅ Fallback → commit message parsing
-                    if (!resolvedEnv) {
-                        def envMatch = (commitMsg =~ /(?i)BUILD_ENV\s*=\s*(\w+)/)
-                        if (envMatch.find()) {
-                            resolvedEnv = envMatch.group(1).toLowerCase()
-                        }
-
-                        echo "📄 ENV from commit message: ${resolvedEnv}"
+                    // ❌ Fail if still not found
+                    if (!buildEnv) {
+                        error "❌ BUILD_ENV not found in commit message or PR labels"
                     }
 
-                    if (!resolvedEnv) {
-                        error "❌ BUILD_ENV not found in PR labels or commit message"
-                    }
-
-                    env.BUILD_ENV = resolvedEnv
-                    env.REQUIRED  = "Build"   // default
+                    env.BUILD_ENV = buildEnv
+                    env.REQUIRED  = "Build"   // default behavior
 
                     echo """
 ===============================
@@ -137,7 +137,7 @@ WORKSPACE   : ${env.WORKSPACE}
 """
                 }
 
-                // ✅ Export for shared library
+                // ✅ Persist for shared library
                 writeFile file: env.PARAMS_FILE, text: """\
 JOB_NAME=${env.JOB_NAME}
 BRANCH=${env.BRANCH}
@@ -148,7 +148,7 @@ WORKSPACE=${env.WORKSPACE}
             }
         }
 
-        // ✅ Execute deployment (shared library)
+        // ✅ Execute shared library deployment
         stage('Run Deployment') {
             steps {
                 deploy("${env.PARAMS_FILE}")
