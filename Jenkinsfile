@@ -9,7 +9,7 @@ pipeline {
 
     stages {
 
-        // ✅ Always checkout the branch that triggered build
+        // ✅ Always checkout triggering branch
         stage('Checkout') {
             steps {
                 script {
@@ -39,7 +39,8 @@ pipeline {
 
                     echo "📝 Commit Message:\n${commitMsg}"
 
-                    if (!(commitMsg =~ /(?i)merge pull request|#\d+/)) {
+                    // ❗ IMPORTANT: no matcher stored → avoids serialization issue
+                    if (!(commitMsg.toLowerCase().contains("merge pull request") || commitMsg.contains("#"))) {
                         error "⛔ Not a PR merge commit. Skipping pipeline."
                     }
 
@@ -48,28 +49,34 @@ pipeline {
             }
         }
 
-        // ✅ Detect PR + ENV dynamically
+        // ✅ Detect PR + ENV
         stage('Detect PR & ENV') {
             steps {
                 script {
-                    // Commit info
+                    // Commit hash
                     env.COMMIT_HASH = sh(
                         script: 'git rev-parse HEAD',
                         returnStdout: true
                     ).trim()
 
+                    // Commit message
                     def commitMsg = sh(
                         script: "git log -1 --pretty=%B",
                         returnStdout: true
                     ).trim()
 
-                    // Extract PR number (works for merge & squash)
-                    def matcher = (commitMsg =~ /#(\d+)/)
-                    def prNumber = matcher.find() ? matcher.group(1) : null
+                    echo "📝 Commit Message:\n${commitMsg}"
 
-                    echo "🔎 PR #: ${prNumber}"
+                    // ✅ Extract PR number safely
+                    def prNumber = null
+                    def prMatch = (commitMsg =~ /#(\d+)/)
+                    if (prMatch.find()) {
+                        prNumber = prMatch.group(1)
+                    }
 
-                    // Extract repo dynamically
+                    echo "🔎 PR #: ${prNumber ?: 'Not found'}"
+
+                    // ✅ Get repo dynamically
                     def gitUrl = sh(
                         script: "git config --get remote.origin.url",
                         returnStdout: true
@@ -79,7 +86,7 @@ pipeline {
 
                     def resolvedEnv = null
 
-                    // ✅ Try PR labels (if PR exists)
+                    // ✅ Try PR labels
                     if (prNumber) {
                         def apiUrl = "https://api.github.com/repos/${repo}/issues/${prNumber}"
 
@@ -89,7 +96,6 @@ pipeline {
                         ).trim()
 
                         def json = readJSON text: response
-
                         def labels = json.labels.collect { it.name.toLowerCase() }
 
                         echo "🏷️ Labels: ${labels}"
@@ -103,10 +109,12 @@ pipeline {
                         }
                     }
 
-                    // ✅ Fallback → commit message
+                    // ✅ Fallback → commit message parsing
                     if (!resolvedEnv) {
-                        def envMatcher = (commitMsg =~ /(?i)BUILD_ENV\s*=\s*(\w+)/)
-                        resolvedEnv = envMatcher.find() ? envMatcher.group(1).toLowerCase() : null
+                        def envMatch = (commitMsg =~ /(?i)BUILD_ENV\s*=\s*(\w+)/)
+                        if (envMatch.find()) {
+                            resolvedEnv = envMatch.group(1).toLowerCase()
+                        }
 
                         echo "📄 ENV from commit message: ${resolvedEnv}"
                     }
@@ -116,7 +124,7 @@ pipeline {
                     }
 
                     env.BUILD_ENV = resolvedEnv
-                    env.REQUIRED  = "Build"   // default action
+                    env.REQUIRED  = "Build"   // default
 
                     echo """
 ===============================
@@ -129,6 +137,7 @@ WORKSPACE   : ${env.WORKSPACE}
 """
                 }
 
+                // ✅ Export for shared library
                 writeFile file: env.PARAMS_FILE, text: """\
 JOB_NAME=${env.JOB_NAME}
 BRANCH=${env.BRANCH}
@@ -139,7 +148,7 @@ WORKSPACE=${env.WORKSPACE}
             }
         }
 
-        // ✅ Final execution
+        // ✅ Execute deployment (shared library)
         stage('Run Deployment') {
             steps {
                 deploy("${env.PARAMS_FILE}")
